@@ -1,3 +1,11 @@
+/**
+  * MatPBM - simple I/O utility to read/write bitmaps into sparse matrices.
+  *
+  * MatPBM uses Compressed Row Storage to load sparse matrices in memory,
+  * and matrices can be converted from and to binary PBM.
+  *
+  * Copyright 2018 Micky Faas <micky@edukitty.org>
+  */
 #include "matpbm.h"
 #include <stdbool.h>
 #include <string.h>
@@ -6,6 +14,7 @@
 
 #define MAX_LINE 4096 // Maximum length of the line buffer
 #define BLOCK_SIZE 256 // Allocate memory in blocks of this size
+#define PBM_HEADER_COMMENT "CREATOR: Rareman matrix transform demo, https://github.com/mickymuis/rareman"
 
 bmat_t*
 matpbm_loadFromStream( FILE* f ) {
@@ -93,7 +102,7 @@ matpbm_loadFromStream( FILE* f ) {
     }
     mat->nz =pos;
 
-    fprintf( stderr, "(i) Loaded matpbm matrix with density %.3f\n", (double)pos / (double)(m*m) );
+    fprintf( stderr, "(i) Loaded matpbm matrix with density %.5f\n", (double)pos / (double)(m*m) );
 
     return mat;
 err:
@@ -101,9 +110,54 @@ err:
     return NULL;
 }
 
-bmat_t*
+bool
 matpbm_writeToStream( FILE* f, bmat_t* mat ) {
+    if( !f ) return false;
 
+    // Let's write a simple PBM header
+    fprintf( f, "P4\n# %s\n%ld %ld\n", PBM_HEADER_COMMENT, mat->m, mat->m );
+
+    const int blockLen =8;
+    int blockPos =0;
+    char block =0;
+
+    // Iterate over all logical rows
+    for( int ii =0; ii < mat->m; ii++ ) {
+        // Convert logical to physical rows number
+        idx_t i = mat->roworder[ii];
+        idx_t ptr = mat->rowptr[i];
+
+        blockPos =0; block =0;
+        
+        // Iterate over all logical columns
+        for( int jj=0; jj < mat->m; jj++ ) {
+            // Convert logical to physical column number
+            idx_t j =mat->colorder[jj];
+    
+            // Unfortunately, due to reordering, the colind[] array is not sorted.
+            // We have to do a linear search to know if this column is non-zero.
+            for( int k =ptr; k < ptr+ mat->rowlen[i]; k++ ) {
+                if( mat->colind[k] == j ) { 
+                    block |= (1 << (blockLen-1)) >> blockPos;
+                    break;
+                }
+            }
+            // Completed one block, write it to disk
+            if( ++blockPos == blockLen ) {
+                fprintf( f, "%c", block );
+                block =0;
+                blockPos =0;
+            }
+
+        }
+        // Write the last (partial) block
+        if( blockPos != 0 ) {
+            fprintf( f, "%c", block );
+        }
+
+    }
+
+    return true;
 }
 
 void
@@ -111,13 +165,6 @@ matpbm_printDense( bmat_t* mat ) {
     for( int ii =0; ii < mat->m; ii++ ) {
         idx_t i = mat->roworder[ii];
         idx_t ptr = mat->rowptr[i];
-/*        for( int j=0; j < mat->m; j++ ) {
-            if( ptr <= mat->rowptr[i] + mat->rowlen[i] && mat->colind[ptr] == j ) {
-                printf( "X " );
-                ptr++;
-            } else
-                printf( "  " );
-        }*/
         char c = '+';
         for( int jj=0; jj < mat->m; jj++ ) {
             if( jj >= mat->active.p && ii >= mat->active.p )

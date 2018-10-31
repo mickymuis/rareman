@@ -1,3 +1,12 @@
+/**
+  * Rareman - simple C implementation of Hellerman-Rarick transform
+  *
+  * usage: rareman <input pbm file> [output pbm file]
+  * Outfile is optional and ascii art is generated if none is specified.
+  *
+  * Copyright 2018 Micky Faas <micky@edukitty.org>
+  */
+
 #include <stdio.h>
 #define _GNU_SOURCE // for qsort_r()
 #include <stdlib.h>
@@ -42,6 +51,9 @@ hr_transform( bmat_t* mat ) {
 
     while( mat->active.p + mat->active.q < mat->m ) {
 
+        int progress = mat->active.p + mat->active.q;
+        fprintf( stderr, "\b\b\b\b\b%4g%%", (double)progress / (double)mat->m * 100.0 );
+
         numPivotCols =0;
         m =0;
         while( 1 ) {
@@ -55,12 +67,12 @@ hr_transform( bmat_t* mat ) {
             
             // Number of rows in the active matrix
             int numRows = mat->m - mat->active.p;
-            memset( n_nz, 0, mat->m * sizeof( idx_t ) );
 
             // Initialize an array of all rows in the active matrix
             for( int i =0; i < numRows; i++ ) {
                 idx_t row =mat->active.p + i;
                 a_rows[i] = row;
+                n_nz[row] = 0;
 
                // matpbm_rowNNZ( mat, row, mat->active.q, mat->m - mat->active.q );
                 for( int j =0; j < numCols; j++ ) {
@@ -90,17 +102,13 @@ hr_transform( bmat_t* mat ) {
                 printf( "%d, ", n_nz[a_rows[i]] );
             printf( "\n" );*/
 
-            
-            // The number of columns in the active matrix
-
-            memset( n_intersect, 0, mat->m * sizeof( idx_t ) );
-
             // Count the intersections with the active rows containing (min) non-zeroes,
             // and the active non-pivot columns
             for( int j =0; j < numCols; j++ ) {
                 int col = a_cols[j];
                 // Count the number intersections between this column, 
                 // and rows with (min) non-zeroes
+                n_intersect[col] =0;
                 for( int i =0; i < numRows; i++ ) { 
                     int k =a_rows[i];
                     if( n_nz[k] > min ) break;
@@ -188,6 +196,7 @@ hr_transform( bmat_t* mat ) {
         scanf( "%c", &c );*/
 
     }
+    fprintf( stderr, "\b\b\b\b\bDone.\n" );
 
 }
 
@@ -215,11 +224,14 @@ main( int argc, const char** argv ) {
         }
     }
 
-    matpbm_printDense( mat );
+    //matpbm_printDense( mat );
 
     hr_transform( mat );
     
-    matpbm_printDense( mat );
+    if( outfile == stdout )
+        matpbm_printDense( mat );
+    else
+        matpbm_writeToStream( outfile, mat );
 
     matpbm_free( mat );
     if( outfile != stdin ) fclose( outfile );

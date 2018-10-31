@@ -1,3 +1,12 @@
+/**
+  * MatPBM - simple I/O utility to read/write bitmaps into sparse matrices.
+  *
+  * MatPBM uses Compressed Row Storage to load sparse matrices in memory,
+  * and matrices can be converted from and to binary PBM.
+  *
+  * Copyright 2018 Micky Faas <micky@edukitty.org>
+  */
+
 #ifndef MATPBM_H
 #define MATPBM_H
 
@@ -32,7 +41,7 @@ typedef struct {
 bmat_t*
 matpbm_loadFromStream( FILE* f );
 
-bmat_t*
+bool
 matpbm_writeToStream( FILE* f, bmat_t* mat );
 
 void
